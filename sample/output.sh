@@ -7,4 +7,4 @@ echo "test"
 printf "test\n"
 
 @bench "print" only=ksh,mksh,lksh,pdksh,zsh
-print "test\n"
+print "test"

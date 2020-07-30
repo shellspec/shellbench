@@ -17,8 +17,8 @@ cat<<HERE
 Usage: shellbench [options] files...
 
   -s, --shell SHELL[,SHELL...]  The shell(s) to run the benchmark. [default: sh]
-  -t, --time SECONDS            Benchmark execution time. (SECONDS > 0)
-  -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0)
+  -t, --time SECONDS            Benchmark execution time. (SECONDS > 0) [default: 3]
+  -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0) [default: 1]
   -h, --help                    You're looking at it.
 HERE
 }
