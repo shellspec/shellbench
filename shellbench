@@ -1,0 +1,247 @@
+#!/bin/sh
+# shellcheck disable=SC2004,SC2016
+
+set -eu
+
+SHELLS=${SHELLBENCH_SHELLS:-sh}
+NUMBER_OF_SHELLS=0
+WARMUP_TIME=${SHELLBENCH_WARMUP_TIME:-1}
+BENCHMARK_TIME=${SHELLBENCH_BENCHMARK_TIME:-3}
+NAME_WIDTH=${SHELLBENCH_NAME_WIDTH:-30}
+SHELL_WIDTH=${SHELLBENCH_SHELL_WIDTH:-10}
+LF="
+"
+
+usage() {
+cat<<HERE
+Usage: shellbench [options] files...
+
+  -s, --shell SHELL[,SHELL...]  The shell(s) to run the benchmark. [default: sh]
+  -t, --time SECONDS            Benchmark execution time. (SECONDS > 0)
+  -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0)
+  -h, --help                    You're looking at it.
+HERE
+}
+
+preprocess() {
+  set -- '%s\n'
+  while IFS= read -r line; do
+    case $line in
+      @bench | @bench\ *) set -- "$@" "@begin"
+    esac
+    set -- "$@" "$line"
+  done
+  # shellcheck disable=SC2059
+  printf "$@"
+}
+
+readfile() {
+  set -- '%s\n'
+  while IFS= read -r line; do
+    [ "$line" = "@begin" ] && break
+    set -- "$@" "$line"
+  done
+  # shellcheck disable=SC2059
+  [ $# -gt 1 ] && printf "$@"
+}
+
+generate_initialize_helper() {
+  echo 'set -e --'
+  echo 'setup() { :; }'
+  echo 'cleanup() { :; }'
+  echo '__count=0'
+  echo 'trap "cleanup; : >/dev/null; echo \$((\$__count-1)) >&3; exit 1" TERM'
+  if [ $# -gt 0 ]; then "$@"; fi
+}
+
+read_initializer() {
+  generate_initialize_helper readfile
+}
+
+read_bench() {
+  IFS= read -r line || return 1
+  printf '%s' "$line"
+}
+
+generate_code_helper() {
+  echo "setup"
+  echo 'if ! kill -0 "$SIGNAL" 2>/dev/null; then'
+  echo '  echo "error: warmup time too short" >&2'
+  echo '  exit 1'
+  echo 'fi'
+  echo 'while kill -0 "$SIGNAL" 2>/dev/null; do :; done'
+  echo 'while __count=$(($__count+1)); do'
+  if [ $# -gt 0 ]; then "$@"; fi
+  echo 'done'
+}
+
+read_code() {
+  generate_code_helper readfile
+}
+
+syntax_check() {
+  printf '%s' "$2" | $1 -n
+}
+
+bench() {
+  sleep "$WARMUP_TIME" &
+  export SIGNAL=$!
+  $1 -c "$2" &
+  if wait "$SIGNAL"; then
+    sleep "$BENCHMARK_TIME" ||:
+  else
+    # when ctrl-c
+    { kill "$SIGNAL" ||:; } 2>/dev/null
+  fi
+  { kill $! ||:; } 2>/dev/null
+  { wait; } 2>/dev/null
+}
+
+parse_bench() {
+  name="" skip="" only=""
+  if [ $# -gt 0 ]; then
+    name="$1"
+    shift
+  fi
+  while [ $# -gt 0 ]; do
+    case $1 in
+      skip=*) skip=${1#skip=} ;;
+      only=*) only=${1#only=} ;;
+    esac
+    shift
+  done
+}
+
+exists_shell() {
+  $1 -c : 2>/dev/null
+}
+
+is_skip() {
+  [ "$1" ] || return 1
+  set -- "${1##*[ /]}"
+  if [ "$only" ]; then
+    case ",$only," in
+      *",$1,"*) return 1
+    esac
+     return 0
+  fi
+  case ",$skip," in
+    *",$1,"*) return 0
+  esac
+  return 1
+}
+
+comma() {
+  eval "set -- $1 \"\${$1}\" \"\""
+  while [ ${#2} -gt 3 ]; do
+    set -- "$1" "${2%???}" "$(($2 % 1000))${3:+,}$3"
+    case ${3%%,*} in
+      ?) set -- "$1" "$2" "00$3" ;;
+      ??) set -- "$1" "$2" "0$3" ;;
+    esac
+  done
+  set -- "$1" "" "$2${3:+,}$3"
+  eval "$1=\$3"
+}
+
+process() {
+  initializer=$(read_initializer)
+  while bench=$(read_bench); do
+    eval "parse_${bench#@}"
+    code=$(read_code)
+    code="${initializer}${LF}${code}"
+
+    printf "%-${NAME_WIDTH}s " "$1: $name"
+    shells="$SHELLS,"
+    while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
+      result=''
+      if ! exists_shell "$shell"; then
+        result="none"
+      elif is_skip "$shell"; then
+        result="skip"
+      elif syntax_check "$shell" "$code"; then
+        count=$(trap : INT; bench "$shell" "$code" 3>&1 >/dev/null)
+        if [ "$count" ]; then
+          count=$(($count / $BENCHMARK_TIME))
+          comma count
+        fi
+        result="${count:-?}"
+      else
+        result="error"
+      fi
+      printf "%${SHELL_WIDTH}s " "$result"
+    done
+    echo
+  done
+}
+
+line() {
+  set -- "$1" ""
+  while [ "$1" -gt 0 ]; do
+    set -- $(($1 - 1)) "${2}-"
+  done
+  echo "$2"
+}
+
+count_shells() {
+  NUMBER_OF_SHELLS=0
+  set -- "$1,"
+  while [ "$1" ]; do
+    set -- "${1#*,}"
+    NUMBER_OF_SHELLS=$(($NUMBER_OF_SHELLS + 1))
+  done
+}
+
+display_header() {
+  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($SHELL_WIDTH + 1) ))
+  set -- "$1," ""
+  printf "%-${NAME_WIDTH}s" "name"
+  while [ "$1" ]; do
+    set -- "${1#*,}" "${1%%,*}"
+    printf " %${SHELL_WIDTH}s" "$2"
+  done
+  echo
+  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($SHELL_WIDTH + 1) ))
+}
+
+display_footer() {
+  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($SHELL_WIDTH + 1) ))
+  echo "* count: number of executions per second"
+}
+
+PARAMS=''
+
+abort() { echo "$@" >&2; exit 1; }
+unknown() { abort "Unrecognized option '$1'"; }
+required() { [ $# -gt 1 ] || abort "Option '$1' requires an argument"; }
+param() { eval "$1=\$$1\ \\\"\"\\\${$2}\"\\\""; }
+params() { [ "$2" -ge "$3" ] || params_ "$@"; }
+params_() { param "$1" "$2"; params "$1" $(($2 + 1)) "$3"; }
+
+parse_options() {
+  OPTIND=$(($# + 1))
+  while [ $# -gt 0 ]; do
+    case $1 in
+      -s | --shell ) required "$@" && shift; SHELLS=$1 ;;
+      -t | --time  ) required "$@" && shift; BENCHMARK_TIME=$1 ;;
+      -w | --warmup) required "$@" && shift; WARMUP_TIME=$1 ;;
+      -h | --help  ) usage; exit ;;
+      --) shift; params PARAMS $(($OPTIND - $#)) $OPTIND; break ;;
+      -?*) unknown "$@" ;;
+      *) param PARAMS $(($OPTIND - $#))
+    esac
+    shift
+  done
+}
+
+${__SOURCED__:+return}
+
+parse_options "$@"
+eval "set -- $PARAMS"
+
+count_shells "$SHELLS"
+display_header "$SHELLS"
+for file in "$@"; do
+  preprocess < "$file" | process "${file##*/}"
+done
+display_footer
