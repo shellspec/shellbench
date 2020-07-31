@@ -84,7 +84,8 @@ Describe "Sample specfile"
       The line 1 should eq "initialize helper"
       The line 2 should eq "#!/bin/sh"
       The line 3 should eq "setup() { :; }"
-      The lines of output should eq 3
+      The line 4 should eq "setup"
+      The lines of output should eq 4
     End
   End
 

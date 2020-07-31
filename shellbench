@@ -46,7 +46,6 @@ generate_initialize_helper() {
 }
 
 generate_begin_helper() {
-  echo 'setup'
   echo 'if ! kill -0 "$SIGNAL" 2>/dev/null; then'
   echo '  echo "error: warmup time too short" >&2'
   echo '  exit 1'
@@ -70,6 +69,7 @@ read_initializer() {
   done
   # shellcheck disable=SC2059
   [ $# -gt 1 ] && printf "$@"
+  echo 'setup'
 }
 
 read_bench() {
