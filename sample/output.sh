@@ -1,10 +1,16 @@
 #!/bin/sh
 
-@bench "echo"
+#bench "echo"
+@begin
 echo "test"
+@end
 
-@bench "printf"
+#bench "printf"
+@begin
 printf "test\n"
+@end
 
-@bench "print" only=ksh,mksh,lksh,pdksh,zsh
+#bench "print" only=ksh,mksh,lksh,pdksh,zsh
+@begin
 print "test"
+@end

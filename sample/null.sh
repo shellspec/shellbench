@@ -1,20 +1,26 @@
 #!/bin/sh
 
-setup() {
-  unset no_such_variable
-}
+#bench "blank" only=mksh,lksh,zsh
+@begin
+@end
 
-@bench blank only=mksh,lksh,zsh
-# comment only
-
-@bench "assign variable"
+#bench "assign variable"
+@begin
 var=
+@end
 
-@bench "define function"
+#bench "define function"
+@begin
 foo() { :; }
+@end
 
-@bench "undefined variable"
+#bench "undefined variable"
+unset no_such_variable
+@begin
 ${no_such_variable:-}
+@end
 
-@bench ": command"
+#bench ": command"
+@begin
 :
+@end

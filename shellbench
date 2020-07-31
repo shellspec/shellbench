@@ -26,8 +26,9 @@ HERE
 preprocess() {
   set -- '%s\n'
   while IFS= read -r line; do
-    case $line in
-      @bench | @bench\ *) set -- "$@" "@begin"
+    case $line in ("#bench" | "#bench"[[:space:]]*)
+      set -- "$@" "#bench"
+      line="@${line#?}"
     esac
     set -- "$@" "$line"
   done
@@ -35,27 +36,40 @@ preprocess() {
   printf "$@"
 }
 
-readfile() {
-  set -- '%s\n'
-  while IFS= read -r line; do
-    [ "$line" = "@begin" ] && break
-    set -- "$@" "$line"
-  done
-  # shellcheck disable=SC2059
-  [ $# -gt 1 ] && printf "$@"
-}
-
 generate_initialize_helper() {
   echo 'set -e --'
   echo 'setup() { :; }'
   echo 'cleanup() { :; }'
   echo '__count=0'
-  echo 'trap "cleanup; : >/dev/null; echo \$((\$__count-1)) >&3; exit 1" TERM'
-  if [ $# -gt 0 ]; then "$@"; fi
+  echo 'trap "exit 1" TERM'
+  echo 'trap "cleanup; : >/dev/null; echo \$((\$__count-1)) >&3; exit 1" EXIT'
+}
+
+generate_begin_helper() {
+  echo 'setup'
+  echo 'if ! kill -0 "$SIGNAL" 2>/dev/null; then'
+  echo '  echo "error: warmup time too short" >&2'
+  echo '  exit 1'
+  echo 'fi'
+  echo 'while kill -0 "$SIGNAL" 2>/dev/null; do :; done'
+  echo 'while __count=$(($__count+1)); do'
+}
+
+generate_end_helper() {
+  echo 'done'
 }
 
 read_initializer() {
-  generate_initialize_helper readfile
+  generate_initialize_helper
+  set -- '%s\n'
+  while IFS= read -r line; do
+    case ${line#"${line%%[![:space:]]*}"} in
+      "#bench") break ;;
+      *) set -- "$@" "$line"
+    esac
+  done
+  # shellcheck disable=SC2059
+  [ $# -gt 1 ] && printf "$@"
 }
 
 read_bench() {
@@ -63,20 +77,40 @@ read_bench() {
   printf '%s' "$line"
 }
 
-generate_code_helper() {
-  echo "setup"
-  echo 'if ! kill -0 "$SIGNAL" 2>/dev/null; then'
-  echo '  echo "error: warmup time too short" >&2'
-  echo '  exit 1'
-  echo 'fi'
-  echo 'while kill -0 "$SIGNAL" 2>/dev/null; do :; done'
-  echo 'while __count=$(($__count+1)); do'
-  if [ $# -gt 0 ]; then "$@"; fi
-  echo 'done'
-}
-
 read_code() {
-  generate_code_helper readfile
+  begin="" end=""
+
+  set -- '%s\n'
+  while IFS= read -r line; do
+    case ${line#"${line%%[![:space:]]*}"} in
+      "#bench") break ;;
+      @begin)
+        if [ "$begin" ]; then
+          abort "${LF}@begin is duplicated"
+        fi
+        begin=1
+        set -- "$@" "$(generate_begin_helper)" ;;
+      @end)
+        if ! [ "$begin" ]; then
+          abort "${LF}@begin is not defined"
+        fi
+        if [ "$end" ]; then
+          abort "${LF}@end is duplicated"
+        fi
+        end=1
+        set -- "$@" "$(generate_end_helper)" ;;
+      *) set -- "$@" "$line"
+    esac
+  done
+
+  if ! [ "$begin" ]; then
+    abort "${LF}@begin is not defined"
+  fi
+  if [ ! "$end" ]; then
+    abort "${LF}@end is not defined"
+  fi
+  # shellcheck disable=SC2059
+  [ $# -gt 1 ] && printf "$@"
 }
 
 syntax_check() {
@@ -148,10 +182,11 @@ process() {
   initializer=$(read_initializer)
   while bench=$(read_bench); do
     eval "parse_${bench#@}"
+    printf "%-${NAME_WIDTH}s " "$1: $name"
+
     code=$(read_code)
     code="${initializer}${LF}${code}"
 
-    printf "%-${NAME_WIDTH}s " "$1: $name"
     shells="$SHELLS,"
     while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
       result=''
