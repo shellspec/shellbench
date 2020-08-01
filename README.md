@@ -39,7 +39,6 @@ setup() { i=1; }
 cleanup() { :; }
 
 #bench "posix"
-i=1
 @begin
 i=$((i+1))
 @end
@@ -82,7 +81,7 @@ print "test"
 
 ### `#bench`
 
-Define new bencmark
+Define new benchmark
 
 ```sh
 #bench NAME [only=SHELL[,SHELL...]] [skip=SHELL[,SHELL...]]
