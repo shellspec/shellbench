@@ -11,11 +11,11 @@ i=$((i+1))
 #bench "typeset -i" only=bash,ksh,mksh,zsh
 typeset -i i
 @begin
-#i=$((i+1))
+i=$((i+1))
 @end
 
 #bench "increment" only=bash,ksh,mksh,zsh
 typeset -i i
 @begin
-#((i++))
+((i++))
 @end
