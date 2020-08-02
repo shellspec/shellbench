@@ -16,7 +16,7 @@ func() {
 }
 func
 
-#bench "local var" skip=ksh
+#bench "local var" skip=ksh,yash
 func() {
   local var
   @begin
@@ -25,7 +25,7 @@ func() {
 }
 func
 
-#bench "local var (typeset)" only=ksh
+#bench "local var (typeset)" only=ksh,yash
 function func {
   typeset var
   @begin
