@@ -218,24 +218,6 @@ Describe "Sample specfile"
     End
   End
 
-  Describe "bench()"
-    Before WARMUP_TIME=0 BENCHMARK_TIME=0.1
-
-    It "runs benchmark code"
-      When call bench "sh" "echo ok"
-      The output should eq ok
-    End
-
-    Context "when warm up fails"
-      wait() { return 1; }
-      It "stops benchmark"
-        When call bench "sh" "echo ok"
-        The output should be blank
-        The status should be failure
-      End
-    End
-  End
-
   Describe "parse_bench()"
     It "parses @bench arguments"
       When call parse_bench "name" "skip=sh" "only=bash" "dummy"
