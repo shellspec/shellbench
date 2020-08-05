@@ -8,7 +8,7 @@ NUMBER_OF_SHELLS=0
 WARMUP_TIME=${SHELLBENCH_WARMUP_TIME:-1}
 BENCHMARK_TIME=${SHELLBENCH_BENCHMARK_TIME:-3}
 NAME_WIDTH=${SHELLBENCH_NAME_WIDTH:-30}
-SHELL_WIDTH=${SHELLBENCH_SHELL_WIDTH:-10}
+COUNT_WIDTH=${SHELLBENCH_COUNT_WIDTH:-10}
 CORRECTION_MODE=''
 NULLLOOP_COUNT=''
 LF='
@@ -230,7 +230,7 @@ process() {
       else
         result="error"
       fi
-      printf "%${SHELL_WIDTH}s " "$result"
+      printf "%${COUNT_WIDTH}s " "$result"
     done
     echo
   done
@@ -269,7 +269,7 @@ measure_nullloop() {
     fi
     nullloop_count="${nullloop_count}${nullloop_count:+,}${shell}:$count"
     comma count
-    printf "%${SHELL_WIDTH}s " "$count"
+    printf "%${COUNT_WIDTH}s " "$count"
   done
   NULLLOOP_COUNT=$nullloop_count
   echo
@@ -293,19 +293,19 @@ count_shells() {
 }
 
 display_header() {
-  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($SHELL_WIDTH + 1) ))
+  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($COUNT_WIDTH + 1) ))
   set -- "$1," ""
   printf "%-${NAME_WIDTH}s" "name"
   while [ "$1" ]; do
     set -- "${1#*,}" "${1%%,*}"
-    printf " %${SHELL_WIDTH}s" "$2"
+    printf " %${COUNT_WIDTH}s" "$2"
   done
   echo
-  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($SHELL_WIDTH + 1) ))
+  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($COUNT_WIDTH + 1) ))
 }
 
 display_footer() {
-  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($SHELL_WIDTH + 1) ))
+  line $(( $NAME_WIDTH + $NUMBER_OF_SHELLS * ($COUNT_WIDTH + 1) ))
   echo "* count: number of executions per second"
 }
 

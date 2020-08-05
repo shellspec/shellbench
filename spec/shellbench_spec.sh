@@ -381,7 +381,7 @@ Describe "Sample specfile"
   End
 
   Describe "display_header()"
-    Before NAME_WIDTH=20 SHELL_WIDTH=8 NUMBER_OF_SHELLS=3
+    Before NAME_WIDTH=20 COUNT_WIDTH=8 NUMBER_OF_SHELLS=3
 
     It "outputs line"
       When call display_header "sh,bash,zsh"
@@ -392,7 +392,7 @@ Describe "Sample specfile"
   End
 
   Describe "display_footer()"
-    Before NAME_WIDTH=20 SHELL_WIDTH=8 NUMBER_OF_SHELLS=3
+    Before NAME_WIDTH=20 COUNT_WIDTH=8 NUMBER_OF_SHELLS=3
 
     It "outputs line"
       When call display_footer

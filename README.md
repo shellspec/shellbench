@@ -120,13 +120,12 @@ Invoked after each benchmark.
 | SHELLBENCH_BENCHMARK_TIME | Benchmark execution time          | 3       |
 | SHELLBENCH_WARMUP_TIME    | Benchmark preparation time        | 1       |
 | SHELLBENCH_NAME_WIDTH     | Display width of benchmark name   | 30      |
-| SHELLBENCH_SHELL_WIDTH    | Display width of shell name       | 10      |
+| SHELLBENCH_COUNT_WIDTH    | Display width of benchamrk count  | 10      |
 | SHELLBENCH_NULLLOOP_COUNT | null loop measurement             |         |
 
 ## How it works
 
 ShellBench translates `@begin` and `@end` to loop as follows:
-
 
 ```sh
 # From
