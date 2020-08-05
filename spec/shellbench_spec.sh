@@ -303,8 +303,8 @@ Describe "Sample specfile"
     Before WARMUP_TIME=0 BENCHMARK_TIME=2
     bench() {
       case $1 in
-        sh) echo 1000 >&3 ;;
-        bash) echo 2000 >&3 ;;
+        sh) echo 1000 ;;
+        bash) echo 2000 ;;
       esac
     }
 

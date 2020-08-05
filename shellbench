@@ -44,6 +44,7 @@ generate_initialize_helper() {
   echo 'setup() { :; }'
   echo 'cleanup() { :; }'
   echo '__count=0 __ready='
+  echo 'trap : PIPE'
   echo 'trap "exit 1" TERM'
   echo 'trap __ready=1 HUP'
   echo 'trap "cleanup; : >/dev/null; echo \$((\$__count-1)) >&3 2>/dev/null" EXIT'
@@ -129,7 +130,7 @@ bench() {
   trap 'ready=$(($ready + 1))' HUP
   trap 'kill -TERM -$$' INT
 
-  $1 -c "$2" &
+  $1 -c "$2" 3>&1 >/dev/null &
   stopper "$3" "$!" &
 
   # wait for ready
@@ -219,7 +220,7 @@ process() {
       elif is_skip "$shell"; then
         result="skip"
       elif syntax_check "$shell" "$code"; then
-        count=$(bench "$shell" "$code" "$BENCHMARK_TIME" 3>&1 >/dev/null)
+        count=$(bench "$shell" "$code" "$BENCHMARK_TIME")
         if [ "$count" ]; then
           count=$(($count / $BENCHMARK_TIME))
           nullloop=$(get_nullloop "$shell")
@@ -264,7 +265,7 @@ measure_nullloop() {
     exists_shell "$shell" || continue
     count=$(get_nullloop "$shell")
     if [ ! "$count" ]; then
-      count=$(bench "$shell" "$code" "$BENCHMARK_TIME" 3>&1 >/dev/null)
+      count=$(bench "$shell" "$code" "$BENCHMARK_TIME")
       count=$(($count / $BENCHMARK_TIME))
     fi
     nullloop_count="${nullloop_count}${nullloop_count:+,}${shell}:$count"
