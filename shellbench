@@ -9,8 +9,10 @@ WARMUP_TIME=${SHELLBENCH_WARMUP_TIME:-1}
 BENCHMARK_TIME=${SHELLBENCH_BENCHMARK_TIME:-3}
 NAME_WIDTH=${SHELLBENCH_NAME_WIDTH:-30}
 SHELL_WIDTH=${SHELLBENCH_SHELL_WIDTH:-10}
-LF="
-"
+CORRECTION_MODE=''
+NULLLOOP_COUNT=''
+LF='
+'
 
 usage() {
 cat<<HERE
@@ -19,6 +21,7 @@ Usage: shellbench [options] files...
   -s, --shell SHELL[,SHELL...]  The shell(s) to run the benchmark. [default: sh]
   -t, --time SECONDS            Benchmark execution time. (SECONDS > 0) [default: 3]
   -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0) [default: 1]
+  -c, --correct                 Enable correction mode to eliminate loop overhead.
   -h, --help                    You're looking at it.
 HERE
 }
@@ -50,6 +53,9 @@ generate_begin_helper() {
   echo 'kill -HUP "$MAIN_PID"'
   echo 'until [ "$__ready" ]; do __dummy=; done'
   echo 'while __count=$(($__count+1)); do'
+  if [ "$CORRECTION_MODE" ]; then
+    echo '__CORRECTION_MODE='
+  fi
 }
 
 generate_end_helper() {
@@ -134,13 +140,13 @@ bench() {
   # start benchmark
   kill -HUP "-$$"
   wait || exit 1
-
 }
 
 stopper() {
   ready=''
   trap 'ready=1' HUP
   kill -HUP "$MAIN_PID"
+  # shellcheck disable=SC2034
   until [ "$ready" ]; do dummy=; done
   sleep "$1"
   kill -TERM "$2"
@@ -207,7 +213,7 @@ process() {
 
     shells="$SHELLS,"
     while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
-      result=''
+      result='?' count=0
       if ! exists_shell "$shell"; then
         result="none"
       elif is_skip "$shell"; then
@@ -216,9 +222,11 @@ process() {
         count=$(bench "$shell" "$code" "$BENCHMARK_TIME" 3>&1 >/dev/null)
         if [ "$count" ]; then
           count=$(($count / $BENCHMARK_TIME))
-          comma count
+          nullloop=$(get_nullloop "$shell")
+          count=$(correct "$count" "$nullloop")
+          result="$count"
+          comma result
         fi
-        result="${count:-?}"
       else
         result="error"
       fi
@@ -226,6 +234,45 @@ process() {
     done
     echo
   done
+}
+
+correct() {
+  if [ "$2" ]; then
+    awk "BEGIN { print int($1 / ( 1 - ( $1 * ( 1 / $2 ) ) ) ) }" /dev/null
+  else
+    echo "$1"
+  fi
+}
+
+get_nullloop() {
+  set -- ",$1:" ",$NULLLOOP_COUNT,"
+  case $2 in (*"$1"*)
+    set -- "${2##*"$1"}"
+    echo "${1%%,*}"
+  esac
+}
+
+measure_nullloop() {
+  initializer=$(read_initializer)
+  bench=$(read_bench)
+  code=$(read_code)
+  code="${initializer}${LF}${code}"
+  printf "%-${NAME_WIDTH}s " "[null loop]"
+
+  shells="$SHELLS," nullloop_count=''
+  while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
+    exists_shell "$shell" || continue
+    count=$(get_nullloop "$shell")
+    if [ ! "$count" ]; then
+      count=$(bench "$shell" "$code" "$BENCHMARK_TIME" 3>&1 >/dev/null)
+      count=$(($count / $BENCHMARK_TIME))
+    fi
+    nullloop_count="${nullloop_count}${nullloop_count:+,}${shell}:$count"
+    comma count
+    printf "%${SHELL_WIDTH}s " "$count"
+  done
+  NULLLOOP_COUNT=$nullloop_count
+  echo
 }
 
 line() {
@@ -275,10 +322,11 @@ parse_options() {
   OPTIND=$(($# + 1))
   while [ $# -gt 0 ]; do
     case $1 in
-      -s | --shell ) required "$@" && shift; SHELLS=$1 ;;
-      -t | --time  ) required "$@" && shift; BENCHMARK_TIME=$1 ;;
-      -w | --warmup) required "$@" && shift; WARMUP_TIME=$1 ;;
-      -h | --help  ) usage; exit ;;
+      -s | --shell  ) required "$@" && shift; SHELLS=$1 ;;
+      -t | --time   ) required "$@" && shift; BENCHMARK_TIME=$1 ;;
+      -w | --warmup ) required "$@" && shift; WARMUP_TIME=$1 ;;
+      -c | --correct) CORRECTION_MODE=1 ;;
+      -h | --help   ) usage; exit ;;
       --) shift; params PARAMS $(($OPTIND - $#)) $OPTIND; break ;;
       -?*) unknown "$@" ;;
       *) param PARAMS $(($OPTIND - $#))
@@ -293,9 +341,18 @@ trap '' HUP
 parse_options "$@"
 eval "set -- $PARAMS"
 
+[ "$CORRECTION_MODE" ] && NULLLOOP_COUNT=${SHELLBENCH_NULLLOOP_COUNT:-}
+
 count_shells "$SHELLS"
 display_header "$SHELLS"
+[ "$CORRECTION_MODE" ] && measure_nullloop <<HERE
+  $(printf '%s\n' '#bench "loop only"' '@begin' '@end' | preprocess)
+HERE
 for file in "$@"; do
   preprocess < "$file" | process "${file##*/}"
 done
 display_footer
+if [ "$CORRECTION_MODE" ] && [ ! "${SHELLBENCH_NULLLOOP_COUNT:-}" ]; then
+  echo "* To skip null loop measurement, set the environment variable below"
+  echo "export SHELLBENCH_NULLLOOP_COUNT=$NULLLOOP_COUNT"
+fi

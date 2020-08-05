@@ -350,6 +350,22 @@ Describe "Sample specfile"
     End
   End
 
+  Describe "get_nullloop()"
+    Before NULLLOOP_COUNT="sh:123,bash:456,zsh:789"
+
+    Parameters
+      sh 123
+      bash 456
+      zsh 789
+      ksh ""
+    End
+
+    It "gets nullloop value"
+      When call get_nullloop "$1"
+      The output should eq "$2"
+    End
+  End
+
   Describe "line()"
     It "outputs line"
       When call line "10"

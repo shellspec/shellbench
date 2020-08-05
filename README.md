@@ -10,6 +10,7 @@ Usage: shellbench [options] files...
   -s, --shell SHELL[,SHELL...]  The shell(s) to run the benchmark. [default: sh]
   -t, --time SECONDS            Benchmark execution time. (SECONDS > 0) [default: 3]
   -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0) [default: 1]
+  -c, --correct                 Enable correction mode to eliminate loop overhead.
   -h, --help                    You're looking at it.
 ```
 
@@ -120,3 +121,67 @@ Invoked after each benchmark.
 | SHELLBENCH_WARMUP_TIME    | Benchmark preparation time        | 1       |
 | SHELLBENCH_NAME_WIDTH     | Display width of benchmark name   | 30      |
 | SHELLBENCH_SHELL_WIDTH    | Display width of shell name       | 10      |
+| SHELLBENCH_NULLLOOP_COUNT | null loop measurement             |         |
+
+## How it works
+
+ShellBench translates `@begin` and `@end` to loop as follows:
+
+
+```sh
+# From
+@begin
+echo "test"
+@end
+
+# Translate to
+while __count=$(($__count+1)); do
+echo "test"
+done
+```
+
+That is, during the benchmark time, not only `echo` but `while`, `__ count=$(($__count+1))`, count the number of times it is executed.
+
+This loop will be killed by another process after benchmark time. Therefore, after `@end` is not executed.
+
+### Correction mode
+
+Calculate the benchmark measurement results more strictly.
+This mode is suitable when the cost impact of the loop cannot be ignored.
+
+Difference between default and modification mode
+
+- Default mode: Measure `while`, `__count=$(($__count+1))` and target code.
+- Correction mode: Measure only target code
+
+Correction mode first measures the null loop and then eliminates
+the null loop measurement from the benchmark measurement.
+
+```sh
+# Null loop
+while __count=$(($__count+1)); do
+__CORRECTION_MODE=
+done
+```
+
+And translates `@begin` and `@end` in correction mode as follows:
+
+```sh
+# From
+@begin
+echo "test"
+@end
+
+# Translate to
+while __count=$(($__count+1)); do
+__CORRECTION_MODE=
+echo "test"
+done
+```
+
+Compute a corrected value from the null loop execution count and the benchmark count.
+
+Corrected count: `B / ( 1.0 - ( B * ( 1.0 / A ) ) )`
+
+- A: null loop executed count
+- B: benchmark count
