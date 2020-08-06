@@ -67,6 +67,9 @@ generate_benchmark_end_helper() {
   echo 'done'
 }
 
+generate_syntax_begin_helper() { :; }
+generate_syntax_end_helper() { :; }
+
 read_initializer() {
   generate_initialize_helper
   read_chunk
@@ -124,7 +127,7 @@ read_chunk() {
 }
 
 syntax_check() {
-  printf '%s' "$2" | $1 -n
+  "$1" -c "$2" >/dev/null 3>&1 2>&1
 }
 
 bench() {
@@ -135,7 +138,7 @@ bench() {
   trap 'ready=$(($ready + 1))' HUP
   trap 'kill -TERM -$$' INT
 
-  $1 -c "$2" 3>&1 >/dev/null &
+  "$1" -c "$2" 3>&1 >/dev/null &
   stopper "$3" "$!" &
 
   # wait for ready
@@ -214,8 +217,9 @@ process() {
     eval "parse_${bench#@}"
     printf "%-${NAME_WIDTH}s " "$1: $name"
 
-    chunk=$(read_chunk)
-    code=$(printf '%s\n' "$initializer" "$chunk" | translate_bench_code)
+    chunk=$(printf '%s\n' "$initializer"; read_chunk)
+    syntax_check_code=$(printf '%s' "$chunk" | translate_bench_code syntax)
+    code=$(printf '%s' "$chunk" | translate_bench_code)
 
     shells="$SHELLS,"
     while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
@@ -224,7 +228,7 @@ process() {
         result="none"
       elif is_skip "$shell"; then
         result="skip"
-      elif syntax_check "$shell" "$code"; then
+      elif syntax_check "$shell" "$syntax_check_code"; then
         count=$(bench "$shell" "$code" "$BENCHMARK_TIME")
         if [ "$count" ]; then
           count=$(($count / $BENCHMARK_TIME))

@@ -227,7 +227,6 @@ Describe "Sample specfile"
     It "checks syntax"
       When call syntax_check "$1" "$2"
       The status should be "$3"
-      The error should be "$4"
     End
   End
 
