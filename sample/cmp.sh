@@ -9,7 +9,7 @@ if [ "$string" = "string" ]; then
 fi
 @end
 
-#bench "[[ ]]" skip=sh,dash,posh
+#bench "[[ ]]" skip=sh,dash,yash,posh
 @begin
 if [[ $string == "string" ]]; then
   :

@@ -25,6 +25,7 @@ var=$(true)
 @end
 
 #bench "external command"
+true=$(command which true)
 @begin
-/usr/bin/true
+"$true"
 @end
