@@ -258,15 +258,20 @@ measure_nullloop() {
 
   shells="$SHELLS," nullloop_count=''
   while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
-    exists_shell "$shell" || continue
-    count=$(get_nullloop "$shell")
-    if [ ! "$count" ]; then
-      count=$(bench "$shell" "$code" "$BENCHMARK_TIME")
-      count=$(($count / $BENCHMARK_TIME))
+    result="?"
+    if exists_shell "$shell"; then
+      count=$(get_nullloop "$shell")
+      if [ ! "$count" ]; then
+        count=$(bench "$shell" "$code" "$BENCHMARK_TIME")
+        count=$(($count / $BENCHMARK_TIME))
+      fi
+      nullloop_count="${nullloop_count}${nullloop_count:+,}${shell}:$count"
+      result=$count
+      comma result
+    else
+      result="none"
     fi
-    nullloop_count="${nullloop_count}${nullloop_count:+,}${shell}:$count"
-    comma count
-    printf "%${COUNT_WIDTH}s " "$count"
+    printf "%${COUNT_WIDTH}s " "$result"
   done
   NULLLOOP_COUNT=$nullloop_count
   echo

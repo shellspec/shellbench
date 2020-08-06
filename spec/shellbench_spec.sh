@@ -321,6 +321,13 @@ Describe "Sample specfile"
     End
   End
 
+  Describe "correct()"
+    It "corrects benchmark count"
+      When call correct 123 456
+      The output should eq "168"
+    End
+  End
+
   Describe "get_nullloop()"
     Before NULLLOOP_COUNT="sh:123,bash:456,zsh:789"
 
@@ -334,6 +341,44 @@ Describe "Sample specfile"
     It "gets nullloop value"
       When call get_nullloop "$1"
       The output should eq "$2"
+    End
+  End
+
+  Describe "measure_nullloop()"
+    Data
+      #|#bench
+      #|@bench nullloop
+      #|@begin
+      #|var=
+      #|@end
+    End
+
+    Before SHELLS=sh,bash
+    Before WARMUP_TIME=0 BENCHMARK_TIME=2
+    bench() {
+      case $1 in
+        sh) echo 1000 ;;
+        bash) echo 2000 ;;
+      esac
+    }
+
+    It "outputs benchmark results"
+      When call measure_nullloop
+      The word 1 should eq "[null"
+      The word 2 should eq "loop]"
+      The word 3 should eq "500"
+      The word 4 should eq "1,000"
+    End
+
+    Context "when shell not found"
+      exists_shell() { return 1; }
+      It "outputs skipped results"
+        When call measure_nullloop
+        The word 1 should eq "[null"
+        The word 2 should eq "loop]"
+        The word 3 should eq "none"
+        The word 4 should eq "none"
+      End
     End
   End
 
