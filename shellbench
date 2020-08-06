@@ -11,8 +11,6 @@ NAME_WIDTH=${SHELLBENCH_NAME_WIDTH:-30}
 COUNT_WIDTH=${SHELLBENCH_COUNT_WIDTH:-10}
 CORRECTION_MODE=''
 NULLLOOP_COUNT=''
-LF='
-'
 
 usage() {
 cat<<HERE
@@ -44,7 +42,7 @@ generate_initialize_helper() {
   echo 'setup() { :; }'
   echo 'cleanup() { :; }'
   echo '__finished() { cleanup; echo $(($__count-1)) >&3 2>/dev/null; }'
-  echo '__count=0 __ready='
+  echo '__count=0'
   echo 'trap : PIPE'
   echo 'if [ "${ZSH_VERSION:-}" ]; then'
   echo '  trap "__finished; __finished() { :; }; exit 1" TERM'
@@ -54,7 +52,8 @@ generate_initialize_helper() {
   echo 'trap "__finished" EXIT'
 }
 
-generate_begin_helper() {
+generate_benchmark_begin_helper() {
+  echo '__ready='
   echo 'trap __ready=1 HUP'
   echo 'kill -HUP "$MAIN_PID"'
   echo 'until [ "$__ready" ]; do __dummy=; done'
@@ -64,63 +63,64 @@ generate_begin_helper() {
   fi
 }
 
-generate_end_helper() {
+generate_benchmark_end_helper() {
   echo 'done'
 }
 
 read_initializer() {
   generate_initialize_helper
-  set -- '%s\n'
-  while IFS= read -r line; do
-    case ${line#"${line%%[![:space:]]*}"} in
-      "#bench") break ;;
-      *) set -- "$@" "$line"
-    esac
-  done
-  # shellcheck disable=SC2059
-  [ $# -gt 1 ] && printf "$@"
-  echo 'setup'
+  read_chunk
+  echo "setup"
 }
 
-read_bench() {
+read_bench_directive() {
   IFS= read -r line || return 1
   printf '%s' "$line"
 }
 
-read_code() {
-  begin="" end=""
+translate_bench_code() {
+  begin="" end="" type=${1:-benchmark}
 
   set -- '%s\n'
-  while IFS= read -r line; do
+  while IFS= read -r line || [ "$line" ]; do
     case ${line#"${line%%[![:space:]]*}"} in
-      "#bench") break ;;
       @begin)
         if [ "$begin" ]; then
-          abort "${LF}@begin is duplicated"
+          abort "@begin is duplicated"
         fi
         begin=1
-        set -- "$@" "$(generate_begin_helper)" ;;
+        set -- "$@" "$("generate_${type}_begin_helper")" ;;
       @end)
         if ! [ "$begin" ]; then
-          abort "${LF}@begin is not defined"
+          abort "@begin is not defined"
         fi
         if [ "$end" ]; then
-          abort "${LF}@end is duplicated"
+          abort "@end is duplicated"
         fi
         end=1
-        set -- "$@" "$(generate_end_helper)" ;;
+        set -- "$@" "$("generate_${type}_end_helper")" ;;
       *) set -- "$@" "$line"
     esac
   done
 
   if ! [ "$begin" ]; then
-    abort "${LF}@begin is not defined"
+    abort "@begin is not defined"
   fi
   if [ ! "$end" ]; then
-    abort "${LF}@end is not defined"
+    abort "@end is not defined"
   fi
   # shellcheck disable=SC2059
   [ $# -gt 1 ] && printf "$@"
+}
+
+read_chunk() {
+  set -- '%s\n'
+  while IFS= read -r line || [ "$line" ]; do
+    [ "${line#"${line%%[![:space:]]*}"}" = "#bench" ] && break
+    set -- "$@" "$line"
+  done
+  # shellcheck disable=SC2059
+  [ $# -eq 1 ] || printf "$@"
 }
 
 syntax_check() {
@@ -210,12 +210,12 @@ comma() {
 
 process() {
   initializer=$(read_initializer)
-  while bench=$(read_bench); do
+  while bench=$(read_bench_directive); do
     eval "parse_${bench#@}"
     printf "%-${NAME_WIDTH}s " "$1: $name"
 
-    code=$(read_code)
-    code="${initializer}${LF}${code}"
+    chunk=$(read_chunk)
+    code=$(printf '%s\n' "$initializer" "$chunk" | translate_bench_code)
 
     shells="$SHELLS,"
     while [ "$shells" ] && shell=${shells%%,*} && shells=${shells#*,}; do
@@ -260,9 +260,9 @@ get_nullloop() {
 
 measure_nullloop() {
   initializer=$(read_initializer)
-  bench=$(read_bench)
-  code=$(read_code)
-  code="${initializer}${LF}${code}"
+  bench=$(read_bench_directive)
+  chunk=$(read_chunk)
+  code=$(printf '%s\n' "$initializer" "$chunk" | translate_bench_code)
   printf "%-${NAME_WIDTH}s " "[null loop]"
 
   shells="$SHELLS," nullloop_count=''

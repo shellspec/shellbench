@@ -54,16 +54,16 @@ Describe "Sample specfile"
     End
   End
 
-  Describe "generate_begin_helper()"
+  Describe "generate_benchmark_begin_helper()"
     It "generates @begin helper"
-      When call generate_begin_helper
+      When call generate_benchmark_begin_helper
       The output should include "while"
     End
   End
 
-  Describe "generate_end_helper()"
+  Describe "generate_benchmark_end_helper()"
     It "generates @end helper"
-      When call generate_end_helper
+      When call generate_benchmark_end_helper
       The output should include "done"
     End
   End
@@ -89,13 +89,13 @@ Describe "Sample specfile"
     End
   End
 
-  Describe "read_bench()"
+  Describe "read_bench_directive()"
     Data
       #|@bench "name" skip=sh
     End
 
     It "reads @bench directive"
-      When call read_bench
+      When call read_bench_directive
       The output should eq '@bench "name" skip=sh'
     End
 
@@ -103,18 +103,36 @@ Describe "Sample specfile"
     End
 
     It "returns failure if there is no data"
-      When call read_bench
+      When call read_bench_directive
       The output should be blank
       The status should be failure
     End
   End
 
-  Describe "read_code()"
+  Describe "read_chunk()"
+    Data
+      #|foo
+      #|bar
+      #|#bench
+      #|baz
+    End
+
+    result() { %text
+      #|foo
+      #|bar
+    }
+
+    It "reads chunk"
+      When call read_chunk
+      The output should eq "$(result)"
+    End
+  End
+
+  Describe "translate_bench_code()"
     Data
       #|@begin
       #|foo
       #|@end
-      #|#bench
     End
 
     result() { %text
@@ -123,22 +141,21 @@ Describe "Sample specfile"
       #|@end helper
     }
 
-    generate_begin_helper() { echo "@begin helper"; }
-    generate_end_helper() { echo "@end helper"; }
+    generate_benchmark_begin_helper() { echo "@begin helper"; }
+    generate_benchmark_end_helper() { echo "@end helper"; }
 
     It "reads file until the #bench directive"
-      When call read_code
+      When call translate_bench_code
       The output should eq "$(result)"
     End
 
     Context "when @begin and @end are missing"
       Data
         #|foo
-        #|#bench
       End
 
       It "raise error"
-        When run read_code
+        When run translate_bench_code
         The stderr should include "@begin is not defined"
         The status should be failure
       End
@@ -148,11 +165,10 @@ Describe "Sample specfile"
       Data
         #|foo
         #|@end
-        #|#bench
       End
 
       It "raise error"
-        When run read_code
+        When run translate_bench_code
         The stderr should include "@begin is not defined"
         The status should be failure
       End
@@ -164,11 +180,10 @@ Describe "Sample specfile"
         #|@begin
         #|foo
         #|@end
-        #|#bench
       End
 
       It "raise error"
-        When run read_code
+        When run translate_bench_code
         The stderr should include "@begin is duplicated"
         The status should be failure
       End
@@ -178,11 +193,10 @@ Describe "Sample specfile"
       Data
         #|@begin
         #|foo
-        #|#bench
       End
 
       It "raise error"
-        When run read_code
+        When run translate_bench_code
         The stderr should include "@end is not defined"
         The status should be failure
       End
@@ -194,11 +208,10 @@ Describe "Sample specfile"
         #|foo
         #|@end
         #|@end
-        #|#bench
       End
 
       It "raise error"
-        When run read_code
+        When run translate_bench_code
         The stderr should include "@end is duplicated"
         The status should be failure
       End
