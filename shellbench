@@ -9,6 +9,7 @@ WARMUP_TIME=${SHELLBENCH_WARMUP_TIME:-1}
 BENCHMARK_TIME=${SHELLBENCH_BENCHMARK_TIME:-3}
 NAME_WIDTH=${SHELLBENCH_NAME_WIDTH:-30}
 COUNT_WIDTH=${SHELLBENCH_COUNT_WIDTH:-10}
+SHOW_ERROR=''
 CORRECTION_MODE=''
 NULLLOOP_COUNT=''
 
@@ -20,6 +21,7 @@ Usage: shellbench [options] files...
   -t, --time SECONDS            Benchmark execution time. (SECONDS > 0) [default: 3]
   -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0) [default: 1]
   -c, --correct                 Enable correction mode to eliminate loop overhead.
+  -e, --error                   Display error details.
   -h, --help                    You're looking at it.
 HERE
 }
@@ -131,8 +133,12 @@ read_chunk() {
 }
 
 syntax_check() {
-  error=$("$1" -c "$2" 2>&1 >/dev/null 3>&1)
-  [ ! "$error" ]
+  error=$("$1" -c "$2" 2>&1 >/dev/null 3>&1) &&:
+  ex=$?
+  if [ "$ex" -ne 0 ] || [ "$error" ]; then
+    [ "$SHOW_ERROR" ] && printf '\n[ERROR] %s' "$error" >&2
+    return $(($ex == 0 ? 1 : $ex))
+  fi
 }
 
 bench() {
@@ -317,6 +323,7 @@ parse_options() {
       -t | --time   ) required "$@" && shift; BENCHMARK_TIME=$1 ;;
       -w | --warmup ) required "$@" && shift; WARMUP_TIME=$1 ;;
       -c | --correct) CORRECTION_MODE=1 ;;
+      -e | --error  ) SHOW_ERROR=1 ;;
       -h | --help   ) usage; exit ;;
       --) shift; params PARAMS $(($OPTIND - $#)) $OPTIND; break ;;
       -?*) unknown "$@" ;;

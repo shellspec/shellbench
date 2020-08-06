@@ -11,6 +11,7 @@ Usage: shellbench [options] files...
   -t, --time SECONDS            Benchmark execution time. (SECONDS > 0) [default: 3]
   -w, --warmup SECONDS          Benchmark preparation time. (SECONDS > 0) [default: 1]
   -c, --correct                 Enable correction mode to eliminate loop overhead.
+  -e, --error                   Display error details.
   -h, --help                    You're looking at it.
 ```
 
