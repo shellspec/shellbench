@@ -27,7 +27,7 @@ Describe "Sample specfile"
     Describe "@bench directive with parameters"
       Data
         #|foo
-        #|#bench "name" skip=sh
+        #|#bench "name" key=value
         #|bar
         #|baz
       End
@@ -35,7 +35,7 @@ Describe "Sample specfile"
       result() { %text
         #|foo
         #|#bench
-        #|@bench "name" skip=sh
+        #|@bench "name" key=value
         #|bar
         #|baz
       }
@@ -230,12 +230,10 @@ Describe "Sample specfile"
     End
   End
 
-  Describe "parse_bench()"
+  Describe "parse_bench_directive()"
     It "parses @bench arguments"
-      When call parse_bench "name" "skip=sh" "only=bash" "dummy"
+      When call parse_bench_directive "name" "key=value"
       The variable name should eq "name"
-      The variable skip should eq "sh"
-      The variable only should eq "bash"
     End
   End
 
@@ -248,34 +246,6 @@ Describe "Sample specfile"
     It "checks if exists shell"
       When call exists_shell "$1"
       The status should be "$2"
-    End
-  End
-
-  Describe "is_skip()"
-    Parameters
-      sh failure
-      bash success
-      zsh success
-      "busybox ash" success
-      "/bin/bash" success
-    End
-
-    Context "when specified only"
-      Before only=bash,zsh,ash skip=''
-
-      It "checks if it is a shell to skip"
-        When call is_skip "$1"
-        The status should not be "$2"
-      End
-    End
-
-    Context "when specified skip"
-      Before skip=bash,zsh,ash only=''
-
-      It "checks if it is a shell to skip"
-        When call is_skip "$1"
-        The status should be "$2"
-      End
     End
   End
 
@@ -336,17 +306,6 @@ Describe "Sample specfile"
         The word 2 should eq "dummy"
         The word 3 should eq "none"
         The word 4 should eq "none"
-      End
-    End
-
-    Context "when skipped benchmark"
-      is_skip() { return 0; }
-      It "outputs skipped results"
-        When call process "file"
-        The word 1 should eq "file:"
-        The word 2 should eq "dummy"
-        The word 3 should eq "skip"
-        The word 4 should eq "skip"
       End
     End
 

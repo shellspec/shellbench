@@ -67,8 +67,12 @@ generate_benchmark_end_helper() {
   echo 'done'
 }
 
-generate_syntax_begin_helper() { :; }
-generate_syntax_end_helper() { :; }
+generate_syntax_begin_helper() {
+  echo 'while __count=$(($__count+1)) && [ "$__count" -eq 1 ]; do'
+}
+generate_syntax_end_helper() {
+  echo 'done'
+}
 
 read_initializer() {
   generate_initialize_helper
@@ -127,7 +131,8 @@ read_chunk() {
 }
 
 syntax_check() {
-  "$1" -c "$2" >/dev/null 3>&1 2>&1
+  error=$("$1" -c "$2" 2>&1 >/dev/null 3>&1)
+  [ ! "$error" ]
 }
 
 bench() {
@@ -161,38 +166,16 @@ stopper() {
   kill -TERM "$2"
 }
 
-parse_bench() {
-  name="" skip="" only=""
+parse_bench_directive() {
+  name=""
   if [ $# -gt 0 ]; then
     name="$1"
     shift
   fi
-  while [ $# -gt 0 ]; do
-    case $1 in
-      skip=*) skip=${1#skip=} ;;
-      only=*) only=${1#only=} ;;
-    esac
-    shift
-  done
 }
 
 exists_shell() {
   $1 -c : 2>/dev/null
-}
-
-is_skip() {
-  [ "$1" ] || return 1
-  set -- "${1##*[ /]}"
-  if [ "$only" ]; then
-    case ",$only," in
-      *",$1,"*) return 1
-    esac
-     return 0
-  fi
-  case ",$skip," in
-    *",$1,"*) return 0
-  esac
-  return 1
 }
 
 comma() {
@@ -214,7 +197,7 @@ comma() {
 process() {
   initializer=$(read_initializer)
   while bench=$(read_bench_directive); do
-    eval "parse_${bench#@}"
+    eval "parse_bench_directive ${bench#@bench}"
     printf "%-${NAME_WIDTH}s " "$1: $name"
 
     chunk=$(printf '%s\n' "$initializer"; read_chunk)
@@ -226,8 +209,6 @@ process() {
       result='?' count=0
       if ! exists_shell "$shell"; then
         result="none"
-      elif is_skip "$shell"; then
-        result="skip"
       elif syntax_check "$shell" "$syntax_check_code"; then
         count=$(bench "$shell" "$code" "$BENCHMARK_TIME")
         if [ "$count" ]; then

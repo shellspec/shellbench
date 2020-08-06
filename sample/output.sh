@@ -10,7 +10,7 @@ echo "test"
 printf "test\n"
 @end
 
-#bench "print" only=ksh,mksh,lksh,pdksh,zsh
+#bench "print"
 @begin
 print "test"
 @end

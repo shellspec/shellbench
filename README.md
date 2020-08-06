@@ -22,11 +22,11 @@ $ ./shellbench -s sh,bash,ksh,mksh,posh,zsh sample/count.sh sample/output.sh
 name                                   sh       bash        ksh       mksh       posh        zsh
 ------------------------------------------------------------------------------------------------
 count.sh: posix                 1,034,369    248,929    282,537    364,627    411,116    577,090
-count.sh: typeset -i                 skip    237,421    288,133    341,660       skip    593,124
-count.sh: increment                  skip    272,415    443,765    350,265       skip    835,077
+count.sh: typeset -i                error    237,421    288,133    341,660      error    593,124
+count.sh: increment                 error    272,415    443,765    350,265      error    835,077
 output.sh: echo                   279,335    121,104    375,175    179,903    201,718     59,138
 output.sh: printf                 277,989    118,461    209,123        180        179     63,644
-output.sh: print                     skip       skip    281,775    182,388       skip     63,006
+output.sh: print                    error      error    281,775    182,388      error     63,006
 ------------------------------------------------------------------------------------------------
 * count: number of executions per second
 ```
@@ -44,13 +44,13 @@ cleanup() { :; }
 i=$((i+1))
 @end
 
-#bench "typeset -i" only=bash,ksh,mksh,zsh
+#bench "typeset -i"
 typeset -i i
 @begin
 i=$((i+1))
 @end
 
-#bench "increment" only=bash,ksh,mksh,zsh
+#bench "increment"
 typeset -i i
 @begin
 ((i++))
@@ -72,7 +72,7 @@ echo "test"
 printf "test\n"
 @end
 
-#bench "print" only=ksh,mksh,lksh,pdksh,zsh
+#bench "print"
 @begin
 print "test"
 @end
@@ -85,12 +85,8 @@ print "test"
 Define new benchmark
 
 ```sh
-#bench NAME [only=SHELL[,SHELL...]] [skip=SHELL[,SHELL...]]
+#bench NAME
 ```
-
-- NAME: Benchmark name
-- only: Run only on specified shell(s).
-- skip: Skip specified shell(s).
 
 ### @begin & @end
 

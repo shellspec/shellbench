@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#bench "blank" only=mksh,lksh,zsh
+#bench "blank"
 @begin
 @end
 
